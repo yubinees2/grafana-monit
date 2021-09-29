@@ -1,0 +1,87 @@
+version: "3"
+
+networks:
+  grafana:
+  mariadb:
+    external: true
+
+volumes:
+  app_data: {}
+  prometheus:
+  grafana:
+  
+services:
+  prometheus:
+    image: prom/prometheus:v2.21.0
+    volumes:
+      - ./prometheus/:/etc/prometheus/
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+    ports:
+      - 9090:9090
+    networks:
+      - grafana
+
+  loki:
+    image: grafana/loki:1.6.1
+    ports:
+      - 3100:3100
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - grafana
+
+  promtail:
+    image: grafana/promtail:1.6.1
+    volumes:
+      - app_data:/var/log
+    networks:
+      - grafana
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    volumes:
+      - app_data:/var/log
+    ports:
+      - 9100:9100
+    networks:
+      - grafana
+
+  mysqld-exporter:
+    image: prom/mysqld-exporter:latest
+    volumes:
+      - app_data:/var/log
+      - ./exporter/:/etc/
+    command:
+      - "--config.my-cnf=/etc/mysqld-exporter.cnf"
+    ports:
+      - 9104:9104
+    networks:
+      - grafana
+      - mariadb
+
+  grafana:
+    image: grafana/grafana:7.3.6
+    volumes:
+      - grafana
+    ports:
+      - 3000:3000
+    networks:
+      - grafana
+    user: '472'
+
+  app:
+    build: ./app
+    ports:
+      - 8081:80
+    volumes:
+      - app_data:/var/log
+    networks:
+      - grafana
+
+  db:
+    image: grafana/tns-db:latest
+    ports:
+      - 8082:80
+    networks:
+      - grafana
